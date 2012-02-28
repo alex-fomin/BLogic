@@ -213,6 +213,71 @@ namespace BLogic.Derivations
 			localLogicBranch.Branches = arrayOfLogicExpression;
 			return localLogicBranch;
 		}
+
+		public bool Idempotency()
+		{
+			int j = Branches.Length;
+
+			for (var k = 0; k < Branches.Length; k++)
+			{
+				if ((Branches[k] == null) || (!(Branches[k] is ParameterLogicExpression)))
+					continue;
+				var localLogicLeaf1 = (ParameterLogicExpression) Branches[k];
+
+				for (int n = k + 1; n < Branches.Length; n++)
+				{
+					if ((Branches[n] == null) || (!(Branches[n] is ParameterLogicExpression)))
+						continue;
+					var localLogicLeaf2 = (ParameterLogicExpression) Branches[n];
+
+					if (!localLogicLeaf1.Name.Equals(localLogicLeaf2.Name))
+						continue;
+					if (Branches[k].Negated != Branches[n].Negated)
+					{
+						switch (Operator)
+						{
+							case Operator.And:
+								Branches[k] = new LogicValue(false);
+								break;
+							case Operator.Or:
+								Branches[k] = new LogicValue(true);
+								break;
+							default:
+								Console.Error.WriteLine("Software Error: Unimplemented operator: " + Operator);
+								break;
+						}
+					}
+
+					Branches[n] = null;
+					j--;
+				}
+			}
+
+			if (j == Branches.Length)
+				return false;
+			if (j == 1)
+			{
+				var localObject1 = Parent;
+
+				if (localObject1 != null)
+				{
+					localObject1.SetBranch(Branches[0], GetPositionInParent());
+				}
+			}
+			else
+			{
+
+				var localObject = new LogicExpression[j];
+				j = 0;
+
+				foreach (LogicExpression t in Branches.Where(t => t != null))
+				{
+					localObject[j++] = t;
+				}
+				Branches = localObject;
+			}
+			return true;
+		}
 	}
 
 	public enum Operator

@@ -10,45 +10,6 @@ namespace BLogic.Derivations
 
 	public static class LogicHandler
 	{
-		public static LogicDerivation ManipulateLogic(String paramString, LogicExpression paramLogicExpression)
-		{
-			var derivation = new LogicDerivation(paramString, paramLogicExpression);
-
-			if (derivation.CNFandDNF)
-			{
-				return derivation;
-			}
-
-			derivation.CarryOutNonPrimaryOperatorReplacement();
-			derivation.CarryOutBoolValues();
-
-			if (derivation.CNFandDNF)
-			{
-				return derivation;
-			}
-			derivation.CarryOutAssociativity();
-			derivation.CarryOutDeMorgans();
-			derivation.CarryOutAssociativity();
-			derivation.CarryOutIdempotency();
-			derivation.CarryOutBoolValues();
-			derivation.CarryOutAbsorbtion(derivation.Next);
-
-			if (derivation.CNFandDNF)
-			{
-				return derivation;
-			}
-
-			do
-			{
-				derivation.CarryOutDistributivity();
-				derivation.CarryOutAssociativity();
-				derivation.CarryOutIdempotency();
-				derivation.CarryOutBoolValues();
-				derivation.CarryOutAbsorbtion(derivation.Next);
-			} while (!derivation.CNFandDNF);
-			return derivation;
-		}
-
 		public static String GetFormName(LogicalForm paramInt)
 		{
 			switch (paramInt)
@@ -402,73 +363,43 @@ namespace BLogic.Derivations
 			return (i ? Absorption.AbsorbedRight : Absorption.AbsorbedLeft);
 		}
 
-		public static bool Idempotency(OperatorExpression paramOperatorExpression)
+		public static LogicDerivation LocalLogicDerivation(ParsedExpression expression)
 		{
-			Operator i = paramOperatorExpression.Operator;
+			var derivation = new LogicDerivation(expression.Expression);
 
-			LogicExpression[] arrayOfLogicExpression = paramOperatorExpression.Branches;
-
-			int j = arrayOfLogicExpression.Length;
-
-			for (var k = 0; k < arrayOfLogicExpression.Length; k++)
+			if (derivation.CNFandDNF)
 			{
-				if ((arrayOfLogicExpression[k] == null) || (!(arrayOfLogicExpression[k] is ParameterLogicExpression)))
-					continue;
-				var localLogicLeaf1 = (ParameterLogicExpression) arrayOfLogicExpression[k];
-
-				for (int n = k + 1; n < arrayOfLogicExpression.Length; n++)
-				{
-					if ((arrayOfLogicExpression[n] == null) || (!(arrayOfLogicExpression[n] is ParameterLogicExpression)))
-						continue;
-					var localLogicLeaf2 = (ParameterLogicExpression) arrayOfLogicExpression[n];
-
-					if (!localLogicLeaf1.Name.Equals(localLogicLeaf2.Name))
-						continue;
-					if (arrayOfLogicExpression[k].Negated != arrayOfLogicExpression[n].Negated)
-					{
-						switch (i)
-						{
-							case Operator.And:
-								arrayOfLogicExpression[k] = new LogicValue(false);
-								break;
-							case Operator.Or:
-								arrayOfLogicExpression[k] = new LogicValue(true);
-								break;
-							default:
-								Console.Error.WriteLine("Software Error: Unimplemented operator: " + i);
-								break;
-						}
-					}
-
-					arrayOfLogicExpression[n] = null;
-					j--;
-				}
+				return derivation;
 			}
 
-			if (j == arrayOfLogicExpression.Length)
-				return false;
-			if (j == 1)
+			derivation.CarryOutNonPrimaryOperatorReplacement();
+			derivation.CarryOutBoolValues();
+
+			if (derivation.CNFandDNF)
 			{
-				var localObject1 = paramOperatorExpression.Parent;
-
-				if (localObject1 != null)
-				{
-					localObject1.SetBranch(arrayOfLogicExpression[0], paramOperatorExpression.GetPositionInParent());
-				}
+				return derivation;
 			}
-			else
+			derivation.CarryOutAssociativity();
+			derivation.CarryOutDeMorgans();
+			derivation.CarryOutAssociativity();
+			derivation.CarryOutIdempotency();
+			derivation.CarryOutBoolValues();
+			derivation.CarryOutAbsorbtion();
+
+			if (derivation.CNFandDNF)
 			{
-
-				var localObject = new LogicExpression[j];
-				j = 0;
-
-				foreach (LogicExpression t in arrayOfLogicExpression.Where(t => t != null))
-				{
-					localObject[j++] = t;
-				}
-				paramOperatorExpression.Branches = localObject;
+				return derivation;
 			}
-			return true;
+
+			do
+			{
+				derivation.CarryOutDistributivity();
+				derivation.CarryOutAssociativity();
+				derivation.CarryOutIdempotency();
+				derivation.CarryOutBoolValues();
+				derivation.CarryOutAbsorbtion();
+			} while (!derivation.CNFandDNF);
+			return derivation;
 		}
 	}
 

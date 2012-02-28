@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -7,25 +6,22 @@ namespace BLogic.Derivations
 {
 	public class LogicDerivation
 	{
-		private readonly String _initialText;
 		private readonly List<LogicStep> _steps;
 		private int _cnfNumberOfElements;
 		private int _dnfNumberOfElements;
 
-		public LogicDerivation(String paramString, LogicExpression paramLogicExpression)
+		public LogicDerivation(LogicExpression paramLogicExpression)
 		{
-			_initialText = paramString;
-
 			_steps = new List<LogicStep>();
+
+			_next = paramLogicExpression.Clone();
 
 			AddStep(paramLogicExpression, "Initial parsed expression");
 		}
 
-		public void AddStep(LogicExpression paramLogicExpression, String paramString)
+		private void AddStep(LogicExpression paramLogicExpression, string paramString)
 		{
 			LogicalForm logicalForm = paramLogicExpression.GetLogicalForm();
-
-			Next = paramLogicExpression.Clone();
 
 			var localLogicStep = new LogicStep {Expression = paramLogicExpression, Comment = paramString, Form = logicalForm};
 
@@ -41,7 +37,7 @@ namespace BLogic.Derivations
 					_cnfNumberOfElements = j;
 				}
 			}
-			if (logicalForm.HasFlag( LogicalForm.LogicDNF ))
+			if (logicalForm.HasFlag(LogicalForm.LogicDNF))
 			{
 				if ((_dnf == null) || (j < _dnfNumberOfElements))
 				{
@@ -51,7 +47,7 @@ namespace BLogic.Derivations
 			}
 		}
 
-		public LogicExpression Next { get; private set; }
+		private LogicExpression _next;
 
 		private LogicExpression _cnf;
 
@@ -64,34 +60,24 @@ namespace BLogic.Derivations
 			get { return (_cnf != null) && (_dnf != null); }
 		}
 
-		public void PrintTrace(LogicSyntax logicSyntax, NegationSyntax negationSyntax)
+		public IEnumerable<LogicStep> Steps
 		{
-			int i = _initialText.Length;
-			var localStringBuilder = new StringBuilder();
-
-			for (int j = 0; j < i; j++)
-			{
-				localStringBuilder.Append(" ");
-			}
-			String str = localStringBuilder.ToString();
-			int k = 1;
-
-			foreach (LogicStep localLogicStep in _steps)
-			{
-				Console.WriteLine(
-					new StringBuilder().Append(k != 0 ? _initialText : str).Append(" |=| ").Append(
-						localLogicStep.Expression.ToString(logicSyntax, negationSyntax)).Append(" - ").Append(localLogicStep.Comment).Append(
-							" - ").Append(LogicHandler.GetFormName(localLogicStep.Form)).ToString());
-
-				k = 0;
-			}
-
-			Console.WriteLine(new StringBuilder().Append("CNF: ").Append(_cnf.ToString(logicSyntax, negationSyntax)).ToString());
-			Console.WriteLine(new StringBuilder().Append("DNF: ").Append(_dnf.ToString(logicSyntax, negationSyntax)).ToString());
+			get { return _steps; }
 		}
 
-		public void CarryOutAbsorbtion(LogicExpression localObject)
+		public LogicExpression CNF
 		{
+			get { return _cnf; }
+		}
+
+		public LogicExpression DNF
+		{
+			get { return _dnf; }
+		}
+
+		public void CarryOutAbsorbtion()
+		{
+			var localObject = _next;
 			int i = 0;
 			LogicExpression localLogicExpression1;
 			while ((localLogicExpression1 = localObject.GetSubExpression(3, i)) != null)
@@ -122,8 +108,10 @@ namespace BLogic.Derivations
 						i--;
 					}
 
+					_next = localObject.Clone();
+
 					AddStep(localObject, "Absorbtion");
-					localObject = Next;
+					localObject = _next;
 					continue;
 				}
 
@@ -133,12 +121,11 @@ namespace BLogic.Derivations
 
 		public void CarryOutNonPrimaryOperatorReplacement()
 		{
-			LogicExpression localLogicExpression1 = Next;
+			LogicExpression localLogicExpression1 = _next;
 
-			int i = localLogicExpression1.GetDepth();
-
-			for (int k = 2; k <= i; k++)
+			for (int k = 2; k <= localLogicExpression1.GetDepth(); k++)
 			{
+				
 				int j = 0;
 				LogicExpression localLogicExpression2;
 				while ((localLogicExpression2 = localLogicExpression1.GetSubExpression(k, j++)) != null)
@@ -150,23 +137,29 @@ namespace BLogic.Derivations
 						case Operator.OperatorImplies:
 							LogicHandler.ReplaceIMPLIESOperator(localLogicBranch);
 							j += 2;
+		
+							_next = localLogicExpression1.Clone();
 							AddStep(localLogicExpression1, "Replaced IMPLIES operator");
+							localLogicExpression1 = _next;
 
-							localLogicExpression1 = Next;
 							break;
 						case Operator.OperatorBiimplies:
 							LogicHandler.ReplaceBIIMPLIESOperator(localLogicBranch);
 							j++;
+							_next = localLogicExpression1.Clone();
+
 							AddStep(localLogicExpression1, "Replaced BIIMPLIES operator");
 
-							localLogicExpression1 = Next;
+							localLogicExpression1 = _next;
 							break;
 						case Operator.OperatorXor:
 							LogicHandler.ReplaceXOROperator(localLogicBranch);
 							j++;
-							AddStep(localLogicExpression1, "Replaced XOR operator");
 
-							localLogicExpression1 = Next;
+							_next = localLogicExpression1.Clone();
+							AddStep(localLogicExpression1, "Replaced XOR operator");
+							localLogicExpression1 = _next;
+		
 							break;
 						default:
 							j++;
@@ -178,7 +171,7 @@ namespace BLogic.Derivations
 
 		public void CarryOutBoolValues()
 		{
-			var expression = Next;
+			var expression = _next;
 
 			int i = expression.GetDepth();
 
@@ -243,6 +236,8 @@ namespace BLogic.Derivations
 						if (localObject2 == null)
 						{
 							localLogicValue.SetParent(null, -1);
+							_next = localLogicValue.Clone();
+
 							AddStep(localLogicValue, "Resolved bool values");
 							break;
 						}
@@ -259,14 +254,16 @@ namespace BLogic.Derivations
 
 				if (k == 0)
 					continue;
+				_next = expression.Clone();
+
 				AddStep(expression, "Removed redundant bool values");
-				expression = Next;
+				expression = _next;
 			}
 		}
 
 		public void CarryOutAssociativity()
 		{
-			LogicExpression localLogicExpression1 = Next;
+			LogicExpression localLogicExpression1 = _next;
 
 			int i = localLogicExpression1.GetDepth();
 
@@ -278,8 +275,10 @@ namespace BLogic.Derivations
 				{
 					if (LogicHandler.Associativity((OperatorExpression) localLogicExpression2))
 					{
+						_next = localLogicExpression1.Clone();
+
 						AddStep(localLogicExpression1, "Associativity");
-						localLogicExpression1 = Next;
+						localLogicExpression1 = _next;
 						continue;
 					}
 
@@ -299,6 +298,8 @@ namespace BLogic.Derivations
 					localLogicExpression1 = arrayOfLogicExpression[0];
 					localLogicExpression1.SetParent(null, -1);
 
+					_next = localLogicExpression1.Clone();
+
 					AddStep(localLogicExpression1, "Associativity");
 				}
 			}
@@ -306,20 +307,22 @@ namespace BLogic.Derivations
 
 		public void CarryOutDeMorgans()
 		{
-			LogicExpression localLogicExpression1 = Next;
+			LogicExpression expression = _next;
 
-			int i = localLogicExpression1.GetDepth();
+			int i = expression.GetDepth();
 
 			for (int k = i; k >= 2; k--)
 			{
 				int j = 0;
-				LogicExpression localLogicExpression2;
-				while ((localLogicExpression2 = localLogicExpression1.GetSubExpression(k, j)) != null)
+				LogicExpression logicExpression;
+				while ((logicExpression = expression.GetSubExpression(k, j)) != null)
 				{
-					if (LogicHandler.DeMorgans((OperatorExpression) localLogicExpression2))
+					if (LogicHandler.DeMorgans((OperatorExpression) logicExpression))
 					{
-						AddStep(localLogicExpression1, "De Morgan's");
-						localLogicExpression1 = Next;
+						_next = expression.Clone();
+
+						AddStep(expression, "De Morgan's");
+						expression = _next;
 						continue;
 					}
 
@@ -331,7 +334,7 @@ namespace BLogic.Derivations
 		public void CarryOutIdempotency()
 		{
 
-			LogicExpression localLogicExpression1 = Next;
+			LogicExpression localLogicExpression1 = _next;
 			{
 				bool i = false;
 
@@ -339,7 +342,7 @@ namespace BLogic.Derivations
 				LogicExpression localLogicExpression2;
 				while ((localLogicExpression2 = localLogicExpression1.GetSubExpression(2, j)) != null)
 				{
-					if (LogicHandler.Idempotency((OperatorExpression)localLogicExpression2))
+					if (((OperatorExpression)localLogicExpression2).Idempotency())
 					{
 						i = true;
 						continue;
@@ -361,13 +364,15 @@ namespace BLogic.Derivations
 					}
 				}
 
+				_next = localLogicExpression1.Clone();
+
 				AddStep(localLogicExpression1, "Idempotency");
 			}
 		}
 
 		public void CarryOutDistributivity()
 		{
-			LogicExpression localLogicExpression1 = Next;
+			LogicExpression localLogicExpression1 = _next;
 
 			int i = 0;
 			LogicExpression localLogicExpression2;
@@ -375,8 +380,10 @@ namespace BLogic.Derivations
 			{
 				if (!LogicHandler.Distributivity((OperatorExpression) localLogicExpression2))
 					continue;
+				_next = localLogicExpression1.Clone();
+
 				AddStep(localLogicExpression1, "Distributivity");
-				localLogicExpression1 = Next;
+				localLogicExpression1 = _next;
 			}
 		}
 	}
