@@ -12,42 +12,41 @@ namespace BLogic.Derivations
 	{
 		public static LogicDerivation ManipulateLogic(String paramString, LogicExpression paramLogicExpression)
 		{
-			var localLogicDerivation = new LogicDerivation(paramString, paramLogicExpression);
+			var derivation = new LogicDerivation(paramString, paramLogicExpression);
 
-			if (localLogicDerivation.CNFandDNF)
+			if (derivation.CNFandDNF)
 			{
-				return localLogicDerivation;
+				return derivation;
 			}
 
-			CarryOutNonPrimaryOperatorReplacement(localLogicDerivation);
-			CarryOutNonPrimaryOperatorReplacement(localLogicDerivation);
-			CarryOutboolValues(localLogicDerivation);
+			derivation.CarryOutNonPrimaryOperatorReplacement();
+			derivation.CarryOutBoolValues();
 
-			if (localLogicDerivation.CNFandDNF)
+			if (derivation.CNFandDNF)
 			{
-				return localLogicDerivation;
+				return derivation;
 			}
-			CarryOutAssociativity(localLogicDerivation);
-			CarryOutDeMorgans(localLogicDerivation);
-			CarryOutAssociativity(localLogicDerivation);
-			CarryOutIdempotency(localLogicDerivation);
-			CarryOutboolValues(localLogicDerivation);
-			CarryOutAbsorbtion(localLogicDerivation);
+			derivation.CarryOutAssociativity();
+			derivation.CarryOutDeMorgans();
+			derivation.CarryOutAssociativity();
+			derivation.CarryOutIdempotency();
+			derivation.CarryOutBoolValues();
+			derivation.CarryOutAbsorbtion(derivation.Next);
 
-			if (localLogicDerivation.CNFandDNF)
+			if (derivation.CNFandDNF)
 			{
-				return localLogicDerivation;
+				return derivation;
 			}
 
 			do
 			{
-				CarryOutDistributivity(localLogicDerivation);
-				CarryOutAssociativity(localLogicDerivation);
-				CarryOutIdempotency(localLogicDerivation);
-				CarryOutboolValues(localLogicDerivation);
-				CarryOutAbsorbtion(localLogicDerivation);
-			} while (!localLogicDerivation.CNFandDNF);
-			return localLogicDerivation;
+				derivation.CarryOutDistributivity();
+				derivation.CarryOutAssociativity();
+				derivation.CarryOutIdempotency();
+				derivation.CarryOutBoolValues();
+				derivation.CarryOutAbsorbtion(derivation.Next);
+			} while (!derivation.CNFandDNF);
+			return derivation;
 		}
 
 		public static String GetFormName(LogicalForm paramInt)
@@ -69,300 +68,7 @@ namespace BLogic.Derivations
 			return "Invalid Form passed";
 		}
 
-		private static void CarryOutNonPrimaryOperatorReplacement(LogicDerivation paramLogicDerivation)
-		{
-			LogicExpression localLogicExpression1 = paramLogicDerivation.Next;
-
-			int i = localLogicExpression1.GetDepth();
-
-			for (int k = 2; k <= i; k++)
-			{
-				int j = 0;
-				LogicExpression localLogicExpression2;
-				while ((localLogicExpression2 = localLogicExpression1.GetSubExpression(k, j++)) != null)
-				{
-					var localLogicBranch = (OperatorExpression) localLogicExpression2;
-
-					switch (localLogicBranch.Operator)
-					{
-						case Operator.OperatorImplies:
-							ReplaceIMPLIESOperator(localLogicBranch);
-							j += 2;
-							paramLogicDerivation.AddStep(localLogicExpression1, "Replaced IMPLIES operator");
-
-							localLogicExpression1 = paramLogicDerivation.Next;
-							break;
-						case Operator.OperatorBiimplies:
-							ReplaceBIIMPLIESOperator(localLogicBranch);
-							j++;
-							paramLogicDerivation.AddStep(localLogicExpression1, "Replaced BIIMPLIES operator");
-
-							localLogicExpression1 = paramLogicDerivation.Next;
-							break;
-						case Operator.OperatorXor:
-							ReplaceXOROperator(localLogicBranch);
-							j++;
-							paramLogicDerivation.AddStep(localLogicExpression1, "Replaced XOR operator");
-
-							localLogicExpression1 = paramLogicDerivation.Next;
-							break;
-						default:
-							j++;
-							break;
-					}
-				}
-			}
-		}
-
-		private static void CarryOutDistributivity(LogicDerivation paramLogicDerivation)
-		{
-			LogicExpression localLogicExpression1 = paramLogicDerivation.Next;
-
-			int i = 0;
-			LogicExpression localLogicExpression2;
-			while ((localLogicExpression2 = localLogicExpression1.GetSubExpression(3, i++)) != null)
-			{
-				if (!Distributivity((OperatorExpression) localLogicExpression2))
-					continue;
-				paramLogicDerivation.AddStep(localLogicExpression1, "Distributivity");
-				localLogicExpression1 = paramLogicDerivation.Next;
-			}
-		}
-
-		private static void CarryOutAbsorbtion(LogicDerivation paramLogicDerivation)
-		{
-			Object localObject = paramLogicDerivation.Next;
-
-			int i = 0;
-			LogicExpression localLogicExpression1;
-			while ((localLogicExpression1 = ((LogicExpression) localObject).GetSubExpression(3, i)) != null)
-			{
-				var localLogicBranch1 = (OperatorExpression) localLogicExpression1;
-				int j = localLogicBranch1.Branches.Length;
-				int k = Absorbtion(localLogicBranch1);
-
-				if (k > 0)
-				{
-					if (j - k == 1)
-					{
-						OperatorExpression localLogicBranch2 = localLogicExpression1.Parent;
-
-						LogicExpression[] arrayOfLogicExpression = localLogicBranch1.Branches;
-						LogicExpression localLogicExpression2 = arrayOfLogicExpression[0];
-
-						if (localLogicBranch2 == null)
-						{
-							localObject = localLogicExpression2;
-							((LogicExpression) localObject).SetParent(null, -1);
-						}
-						else
-						{
-							localLogicBranch2.SetBranch(localLogicExpression2, localLogicBranch1.GetPositionInParent());
-						}
-
-						i--;
-					}
-
-					paramLogicDerivation.AddStep((LogicExpression) localObject, "Absorbtion");
-					localObject = paramLogicDerivation.Next;
-					continue;
-				}
-
-				i++;
-			}
-		}
-
-		private static void CarryOutDeMorgans(LogicDerivation paramLogicDerivation)
-		{
-			LogicExpression localLogicExpression1 = paramLogicDerivation.Next;
-
-			int i = localLogicExpression1.GetDepth();
-
-			for (int k = i; k >= 2; k--)
-			{
-				int j = 0;
-				LogicExpression localLogicExpression2;
-				while ((localLogicExpression2 = localLogicExpression1.GetSubExpression(k, j)) != null)
-				{
-					if (DeMorgans((OperatorExpression) localLogicExpression2))
-					{
-						paramLogicDerivation.AddStep(localLogicExpression1, "De Morgan's");
-						localLogicExpression1 = paramLogicDerivation.Next;
-						continue;
-					}
-
-					j++;
-				}
-			}
-		}
-
-		private static void CarryOutAssociativity(LogicDerivation paramLogicDerivation)
-		{
-			LogicExpression localLogicExpression1 = paramLogicDerivation.Next;
-
-			int i = localLogicExpression1.GetDepth();
-
-			for (int k = 3; k <= i; k++)
-			{
-				int j = 0;
-				LogicExpression localLogicExpression2;
-				while ((localLogicExpression2 = localLogicExpression1.GetSubExpression(k, j)) != null)
-				{
-					if (Associativity((OperatorExpression) localLogicExpression2))
-					{
-						paramLogicDerivation.AddStep(localLogicExpression1, "Associativity");
-						localLogicExpression1 = paramLogicDerivation.Next;
-						continue;
-					}
-
-					j++;
-				}
-			}
-
-			i = localLogicExpression1.GetDepth();
-
-			if (i == 2)
-			{
-				var localLogicBranch = (OperatorExpression) localLogicExpression1;
-				LogicExpression[] arrayOfLogicExpression = localLogicBranch.Branches;
-
-				if (arrayOfLogicExpression.Length == 1)
-				{
-					localLogicExpression1 = arrayOfLogicExpression[0];
-					localLogicExpression1.SetParent(null, -1);
-
-					paramLogicDerivation.AddStep(localLogicExpression1, "Associativity");
-				}
-			}
-		}
-
-		private static void CarryOutIdempotency(LogicDerivation paramLogicDerivation)
-		{
-			LogicExpression localLogicExpression1 = paramLogicDerivation.Next;
-
-			int i = 0;
-
-			int j = 0;
-			LogicExpression localLogicExpression2;
-			while ((localLogicExpression2 = localLogicExpression1.GetSubExpression(2, j)) != null)
-			{
-				if (Idempotency((OperatorExpression) localLogicExpression2))
-				{
-					i = 1;
-					continue;
-				}
-				j++;
-			}
-
-			if (i != 0)
-			{
-				if ((localLogicExpression1 is OperatorExpression))
-				{
-					LogicExpression[] arrayOfLogicExpression = ((OperatorExpression) localLogicExpression1).Branches;
-
-					if (arrayOfLogicExpression.Length == 1)
-					{
-						localLogicExpression1 = arrayOfLogicExpression[0];
-						localLogicExpression1.SetParent(null, -1);
-					}
-				}
-
-				paramLogicDerivation.AddStep(localLogicExpression1, "Idempotency");
-			}
-		}
-
-		private static void CarryOutboolValues(LogicDerivation paramLogicDerivation)
-		{
-			var expression = paramLogicDerivation.Next;
-
-			int i = expression.GetDepth();
-
-			for (int m = 2; m <= i; m++)
-			{
-				int k = 0;
-				int j = 0;
-				LogicExpression localLogicExpression;
-				while ((localLogicExpression = expression.GetSubExpression(m, j)) != null)
-				{
-					var localLogicBranch1 = (OperatorExpression) localLogicExpression;
-					BoolResolution n = GetBoolResolution(localLogicBranch1);
-					if (n == BoolResolution.BoolRemoveBoolValues)
-					{
-						LogicExpression[] arrayOfLogicExpression = localLogicBranch1.Branches;
-						int i1 = arrayOfLogicExpression.Length;
-
-						foreach (LogicExpression t in arrayOfLogicExpression)
-						{
-							if ((t is LogicValue))
-							{
-								i1--;
-							}
-						}
-						if (i1 == 1)
-						{
-							var localObject2 = arrayOfLogicExpression.FirstOrDefault(t => (!(t is LogicValue)));
-
-							OperatorExpression localLogicBranch2 = localLogicExpression.Parent;
-
-							if (localLogicBranch2 == null)
-							{
-								expression = localObject2;
-								localObject2.SetParent(null, -1);
-							}
-							else
-							{
-								localLogicBranch2.SetBranch(localObject2, localLogicExpression.GetPositionInParent());
-							}
-						}
-						else
-						{
-							var expressions = new LogicExpression[i1];
-
-							int i4 = 0;
-
-							foreach (LogicExpression t in arrayOfLogicExpression.Where(t => !(t is LogicValue)))
-							{
-								expressions[i4++] = t;
-							}
-							localLogicBranch1.Branches = expressions;
-
-							j++;
-						}
-
-						k = 1;
-					}
-					else if ((n == BoolResolution.BoolResolveTrue) || (n == BoolResolution.BoolResolveFalse))
-					{
-						bool @bool = n == BoolResolution.BoolResolveTrue;
-						var localLogicValue = new LogicValue(@bool);
-
-						var localObject2 = localLogicBranch1.Parent;
-
-						if (localObject2 == null)
-						{
-							localLogicValue.SetParent(null, -1);
-							paramLogicDerivation.AddStep(localLogicValue, "Resolved bool values");
-							break;
-						}
-
-						localObject2.SetBranch(localLogicValue, localLogicBranch1.GetPositionInParent());
-
-						k = 1;
-					}
-					else
-					{
-						j++;
-					}
-				}
-
-				if (k == 0)
-					continue;
-				paramLogicDerivation.AddStep(expression, "Removed redundant bool values");
-				expression = paramLogicDerivation.Next;
-			}
-		}
-
-		private static BoolResolution GetBoolResolution(OperatorExpression paramOperatorExpression)
+		public static BoolResolution GetBoolResolution(OperatorExpression paramOperatorExpression)
 		{
 			LogicExpression[] arrayOfLogicExpression = paramOperatorExpression.Branches;
 
@@ -400,7 +106,7 @@ namespace BLogic.Derivations
 			return BoolResolution.BoolNotFound;
 		}
 
-		private static void ReplaceIMPLIESOperator(OperatorExpression paramOperatorExpression)
+		public static void ReplaceIMPLIESOperator(OperatorExpression paramOperatorExpression)
 		{
 			LogicExpression[] arrayOfLogicExpression = paramOperatorExpression.Branches;
 
@@ -409,7 +115,7 @@ namespace BLogic.Derivations
 			paramOperatorExpression.Operator = (Operator) 1;
 		}
 
-		private static void ReplaceBIIMPLIESOperator(OperatorExpression paramOperatorExpression)
+		public static void ReplaceBIIMPLIESOperator(OperatorExpression paramOperatorExpression)
 		{
 			LogicExpression[] arrayOfLogicExpression1 = paramOperatorExpression.Branches;
 
@@ -426,37 +132,9 @@ namespace BLogic.Derivations
 			arrayOfLogicExpression3[0].Negated = !arrayOfLogicExpression3[0].Negated;
 			arrayOfLogicExpression3[1].Negated = !arrayOfLogicExpression3[1].Negated;
 
-			var localLogicBranch1 = new OperatorExpression(0) {Branches = arrayOfLogicExpression2};
+			var localLogicBranch1 = new OperatorExpression(Operator.And) { Branches = arrayOfLogicExpression2 };
 
-			var localLogicBranch2 = new OperatorExpression(0) {Branches = arrayOfLogicExpression3};
-
-			LogicExpression[] arrayOfLogicExpression4 = {localLogicBranch1, localLogicBranch2};
-
-			paramOperatorExpression.Branches = arrayOfLogicExpression4;
-			paramOperatorExpression.Operator = (Operator) 1;
-		}
-
-		private static void ReplaceXOROperator(OperatorExpression paramOperatorExpression)
-		{
-			LogicExpression[] arrayOfLogicExpression1 = paramOperatorExpression.Branches;
-
-			LogicExpression[] arrayOfLogicExpression2 = {
-			                                            	arrayOfLogicExpression1[0].Clone(),
-			                                            	arrayOfLogicExpression1[1].Clone()
-			                                            };
-
-			arrayOfLogicExpression2[0].Negated = !arrayOfLogicExpression2[0].Negated;
-
-			LogicExpression[] arrayOfLogicExpression3 = {
-			                                            	arrayOfLogicExpression1[0].Clone(),
-			                                            	arrayOfLogicExpression1[1].Clone()
-			                                            };
-
-			arrayOfLogicExpression3[1].Negated = !arrayOfLogicExpression3[1].Negated;
-
-			var localLogicBranch1 = new OperatorExpression(0) {Branches = arrayOfLogicExpression2};
-
-			var localLogicBranch2 = new OperatorExpression(0) {Branches = arrayOfLogicExpression3};
+			var localLogicBranch2 = new OperatorExpression(Operator.And) { Branches = arrayOfLogicExpression3 };
 
 			LogicExpression[] arrayOfLogicExpression4 = {localLogicBranch1, localLogicBranch2};
 
@@ -464,7 +142,40 @@ namespace BLogic.Derivations
 			paramOperatorExpression.Operator = Operator.Or;
 		}
 
-		private static bool DeMorgans(OperatorExpression paramOperatorExpression)
+		public static void ReplaceXOROperator(OperatorExpression paramOperatorExpression)
+		{
+			LogicExpression[] branches = paramOperatorExpression.Branches;
+
+			LogicExpression[] expressions = {
+			                                            	branches[0].Clone(),
+			                                            	branches[1].Clone()
+			                                            };
+
+			expressions[0].Negated = !expressions[0].Negated;
+
+			LogicExpression[] arrayOfLogicExpression3 = {
+			                                            	branches[0].Clone(),
+			                                            	branches[1].Clone()
+			                                            };
+
+			arrayOfLogicExpression3[1].Negated = !arrayOfLogicExpression3[1].Negated;
+
+			LogicExpression[] arrayOfLogicExpression4 = {
+			                                            	new OperatorExpression(Operator.And)
+			                                            		{
+			                                            			Branches = expressions
+			                                            		},
+			                                            	new OperatorExpression(Operator.And)
+			                                            		{
+			                                            			Branches = arrayOfLogicExpression3
+			                                            		}
+			                                            };
+
+			paramOperatorExpression.Branches = arrayOfLogicExpression4;
+			paramOperatorExpression.Operator = Operator.Or;
+		}
+
+		public static bool DeMorgans(OperatorExpression paramOperatorExpression)
 		{
 			Operator i = paramOperatorExpression.Operator;
 
@@ -478,15 +189,14 @@ namespace BLogic.Derivations
 			{
 				t.Negated = !t.Negated;
 			}
-			var j = i == Operator.And ? Operator.Or : Operator.And;
 
-			paramOperatorExpression.Operator = j;
+			paramOperatorExpression.Operator = i == Operator.And ? Operator.Or : Operator.And;
 			paramOperatorExpression.Negated = false;
 
 			return true;
 		}
 
-		private static bool Associativity(OperatorExpression paramOperatorExpression)
+		public static bool Associativity(OperatorExpression paramOperatorExpression)
 		{
 			LogicExpression[] arrayOfLogicExpression1 = paramOperatorExpression.Branches;
 
@@ -534,41 +244,39 @@ namespace BLogic.Derivations
 			return true;
 		}
 
-		private static bool Distributivity(OperatorExpression paramOperatorExpression)
+		public static bool Distributivity(OperatorExpression paramOperatorExpression)
 		{
-			Operator i = paramOperatorExpression.Operator;
+			Operator @operator = paramOperatorExpression.Operator;
 
-			LogicExpression[] arrayOfLogicExpression1 = paramOperatorExpression.Branches;
-			var arrayOfLogicExpression = new LogicExpression[arrayOfLogicExpression1.Length][];
-			LogicExpression[] arrayOfLogicExpression2;
+			LogicExpression[] branches = paramOperatorExpression.Branches;
+			var arrayOfLogicExpression = new LogicExpression[branches.Length][];
 
 			int j = 0;
 			int k = 1;
 
-			foreach (LogicExpression t in arrayOfLogicExpression1)
+			foreach (LogicExpression expression in branches)
 			{
-				if (((t is ParameterLogicExpression)) || ((t is LogicValue)))
+				if (((expression is ParameterLogicExpression)) || ((expression is LogicValue)))
 				{
-					arrayOfLogicExpression2 = new[] {t};
-					arrayOfLogicExpression[(j++)] = arrayOfLogicExpression2;
+					arrayOfLogicExpression[(j++)] = new[] {expression};
 				}
 				else
 				{
-					arrayOfLogicExpression[j] = ((OperatorExpression) t).Branches;
+					arrayOfLogicExpression[j] = ((OperatorExpression) expression).Branches;
 					k *= arrayOfLogicExpression[j].Length;
 					j++;
 				}
 			}
 
-			if (k*arrayOfLogicExpression1.Length == j)
+			if (k*branches.Length == j)
 			{
 				return false;
 			}
 			var arrayOfInt = new int[arrayOfLogicExpression.Length];
-			arrayOfInt[(arrayOfInt.Length - 1)] = -1;
-			arrayOfLogicExpression2 = new LogicExpression[k];
+			arrayOfInt[arrayOfInt.Length - 1] = -1;
+			var expressions = new LogicExpression[k];
 
-			for (int n = 0; n < arrayOfLogicExpression2.Length; n++)
+			for (int n = 0; n < expressions.Length; n++)
 			{
 				arrayOfInt[(arrayOfInt.Length - 1)] += 1;
 
@@ -588,26 +296,26 @@ namespace BLogic.Derivations
 				}
 				if (arrayOfLogicExpression3.Length == 1)
 				{
-					arrayOfLogicExpression2[n] = arrayOfLogicExpression3[0];
+					expressions[n] = arrayOfLogicExpression3[0];
 				}
 				else
 				{
-					arrayOfLogicExpression2[n] = new OperatorExpression(i)
+					expressions[n] = new OperatorExpression(@operator)
 					                             	{
 					                             		Branches = arrayOfLogicExpression3
 					                             	};
 				}
 			}
 
-			var nn = (Operator) (i == 0 ? 1 : 0);
+			var nn = (Operator) (@operator == 0 ? 1 : 0);
 
-			paramOperatorExpression.Branches = arrayOfLogicExpression2;
+			paramOperatorExpression.Branches = expressions;
 			paramOperatorExpression.Operator = nn;
 
 			return true;
 		}
 
-		private static int Absorbtion(OperatorExpression paramOperatorExpression)
+		public static int Absorbtion(OperatorExpression paramOperatorExpression)
 		{
 			LogicExpression[] arrayOfLogicExpression1 = paramOperatorExpression.Branches;
 
@@ -694,7 +402,7 @@ namespace BLogic.Derivations
 			return (i ? Absorption.AbsorbedRight : Absorption.AbsorbedLeft);
 		}
 
-		private static bool Idempotency(OperatorExpression paramOperatorExpression)
+		public static bool Idempotency(OperatorExpression paramOperatorExpression)
 		{
 			Operator i = paramOperatorExpression.Operator;
 
@@ -772,7 +480,7 @@ namespace BLogic.Derivations
 
 	}
 
-	internal enum BoolResolution
+	public enum BoolResolution
 	{
 		BoolRemoveBoolValues = 31,
 		BoolResolveTrue = 32,
